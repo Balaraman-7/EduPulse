@@ -7,7 +7,7 @@ import { getDropoutPrediction } from '../services/mlService.js';
 
 export const getStudents = async (req, res) => {
   try {
-    const { departmentId, classId, riskLevel, search, semester } = req.query;
+    const { departmentId, department, classId, riskLevel, search, semester } = req.query;
     let query = { status: 'Active' };
 
     // If role is FACULTY, filter by assigned facultyId unless Admin
@@ -17,6 +17,8 @@ export const getStudents = async (req, res) => {
 
     if (departmentId && departmentId !== 'All') {
       query.departmentId = departmentId;
+    } else if (department && department !== 'All') {
+      query.department = { $regex: department, $options: 'i' };
     }
     if (classId && classId !== 'All') {
       query.classId = classId;

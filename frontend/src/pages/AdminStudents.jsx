@@ -8,6 +8,7 @@ import { Search, Plus, Sparkles, Edit, Trash2, UserPlus, Eye, Filter } from 'luc
 export default function AdminStudents() {
   const [students, setStudents] = useState([]);
   const [facultyList, setFacultyList] = useState([]);
+  const [departmentsList, setDepartmentsList] = useState([]);
   const [loading, setLoading] = useState(true);
   
   // Filters
@@ -50,9 +51,19 @@ export default function AdminStudents() {
     }
   };
 
+  const fetchDepartments = async () => {
+    try {
+      const res = await api.get('/departments');
+      setDepartmentsList(res.data);
+    } catch (err) {
+      console.error('[AdminStudents] Failed to load departments:', err);
+    }
+  };
+
   useEffect(() => {
     fetchStudents();
     fetchFaculty();
+    fetchDepartments();
   }, [search, department, semester, riskLevel]);
 
   const handleDelete = async (id, name) => {
@@ -113,12 +124,14 @@ export default function AdminStudents() {
           <select
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white font-semibold text-gray-700"
           >
             <option value="All">All Departments</option>
-            <option value="Computer Science">Computer Science</option>
-            <option value="Information Technology">Information Technology</option>
-            <option value="Electrical Engineering">Electrical Engineering</option>
+            {departmentsList.map((d) => (
+              <option key={d._id} value={d.name}>
+                {d.name}
+              </option>
+            ))}
           </select>
         </div>
 
