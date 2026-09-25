@@ -87,11 +87,21 @@ export const createStudent = async (req, res) => {
     const dept = await Department.findById(departmentId);
     if (!dept) return res.status(400).json({ message: 'Invalid Department selected' });
 
-    const cls = await Class.findById(classId);
-    if (!cls) return res.status(400).json({ message: 'Invalid Class selected' });
-
-    if (cls.departmentId.toString() !== dept._id.toString()) {
-      return res.status(400).json({ message: 'Selected Class does not belong to the selected Department' });
+    let cls = classId ? await Class.findById(classId) : null;
+    if (!cls || cls.departmentId.toString() !== dept._id.toString()) {
+      cls = await Class.findOne({ departmentId: dept._id });
+    }
+    if (!cls) {
+      cls = new Class({
+        departmentId: dept._id,
+        name: `${dept.code}-A`,
+        code: `${dept.code}-A-2026`,
+        academicYear: '2026-27',
+        semester: 4,
+        section: 'A',
+        status: 'Active'
+      });
+      await cls.save();
     }
 
     // Create user account

@@ -2,6 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { X, Sparkles } from 'lucide-react';
 import api from '../services/api';
 
+const getIdStr = (obj) => {
+  if (!obj) return '';
+  if (typeof obj === 'string') return obj;
+  if (obj._id) return String(obj._id);
+  return String(obj);
+};
+
+const getClassDeptIdStr = (c) => {
+  if (!c || !c.departmentId) return '';
+  if (typeof c.departmentId === 'object' && c.departmentId._id) {
+    return String(c.departmentId._id);
+  }
+  return String(c.departmentId);
+};
+
 export default function StudentModal({ isOpen, onClose, student, onSave }) {
   const [departments, setDepartments] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -13,7 +28,7 @@ export default function StudentModal({ isOpen, onClose, student, onSave }) {
     email: '',
     phone: '',
     rollNumber: '',
-    admissionYear: 2024,
+    admissionYear: 2026,
     departmentId: '',
     classId: '',
     gender: 'Male',
@@ -43,20 +58,28 @@ export default function StudentModal({ isOpen, onClose, student, onSave }) {
           api.get('/classes'),
           api.get('/faculty')
         ]);
-        setDepartments(deptRes.data);
-        setClasses(classRes.data);
-        setFacultyList(facRes.data);
+
+        const depts = deptRes.data || [];
+        const clss = classRes.data || [];
+        const facs = facRes.data || [];
+
+        setDepartments(depts);
+        setClasses(clss);
+        setFacultyList(facs);
 
         if (student) {
-          const deptId = student.departmentId?._id || student.departmentId || (deptRes.data[0]?._id || '');
+          const deptId = getIdStr(student.departmentId) || (depts[0] ? getIdStr(depts[0]) : '');
+          const availClasses = clss.filter(c => getClassDeptIdStr(c) === deptId);
+          const clsId = getIdStr(student.classId) || (availClasses[0] ? getIdStr(availClasses[0]) : '');
+
           setFormData({
             name: student.name || '',
             email: student.email || '',
             phone: student.phone || '',
             rollNumber: student.rollNumber || '',
-            admissionYear: student.admissionYear || 2024,
+            admissionYear: student.admissionYear || 2026,
             departmentId: deptId,
-            classId: student.classId?._id || student.classId || '',
+            classId: clsId,
             gender: student.gender || 'Male',
             attendancePercentage: student.attendancePercentage ?? 75,
             internalMarks: student.internalMarks ?? 65,
@@ -67,19 +90,16 @@ export default function StudentModal({ isOpen, onClose, student, onSave }) {
             familyIncomeCategory: student.familyIncomeCategory || 'Medium',
             internetAccess: student.internetAccess || 'Yes',
             extracurricularParticipation: student.extracurricularParticipation || 'Moderate',
-            facultyId: student.facultyId?._id || student.facultyId || ''
+            facultyId: getIdStr(student.facultyId)
           });
-
-          // Filter classes for selected department
-          const availClasses = classRes.data.filter(c => c.departmentId?._id === deptId || c.departmentId === deptId);
           setFilteredClasses(availClasses);
-        } else if (deptRes.data.length > 0) {
-          const firstDeptId = deptRes.data[0]._id;
-          const availClasses = classRes.data.filter(c => c.departmentId?._id === firstDeptId || c.departmentId === firstDeptId);
+        } else if (depts.length > 0) {
+          const firstDeptId = getIdStr(depts[0]);
+          const availClasses = clss.filter(c => getClassDeptIdStr(c) === firstDeptId);
           setFormData(prev => ({
             ...prev,
             departmentId: firstDeptId,
-            classId: availClasses[0]?._id || ''
+            classId: availClasses[0] ? getIdStr(availClasses[0]) : ''
           }));
           setFilteredClasses(availClasses);
         }
@@ -93,12 +113,13 @@ export default function StudentModal({ isOpen, onClose, student, onSave }) {
 
   // Handle Cascading Selection: When Department changes, filter Classes!
   const handleDepartmentChange = (deptId) => {
-    const availClasses = classes.filter(c => c.departmentId?._id === deptId || c.departmentId === deptId);
+    const targetDeptId = String(deptId || '');
+    const availClasses = classes.filter(c => getClassDeptIdStr(c) === targetDeptId);
     setFilteredClasses(availClasses);
     setFormData(prev => ({
       ...prev,
-      departmentId: deptId,
-      classId: availClasses[0]?._id || '' // auto select first valid class
+      departmentId: targetDeptId,
+      classId: availClasses[0] ? getIdStr(availClasses[0]) : ''
     }));
   };
 
@@ -106,6 +127,11 @@ export default function StudentModal({ isOpen, onClose, student, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.departmentId) {
+      setError('Please select a valid Department');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -118,6 +144,7 @@ export default function StudentModal({ isOpen, onClose, student, onSave }) {
       onSave();
       onClose();
     } catch (err) {
+      console.error('[StudentModal Error]:', err);
       setError(err.response?.data?.message || 'Error saving student record');
     } finally {
       setLoading(false);
@@ -160,10 +187,11 @@ export default function StudentModal({ isOpen, onClose, student, onSave }) {
                   required
                   value={formData.departmentId}
                   onChange={(e) => handleDepartmentChange(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-blue-500 bg-white"
                 >
+                  <option value="">-- Select Department --</option>
                   {departments.map(d => (
-                    <option key={d._id} value={d._id}>{d.name} ({d.code})</option>
+                    <option key={d._id} value={getIdStr(d)}>{d.name} ({d.code})</option>
                   ))}
                 </select>
               </div>
@@ -171,16 +199,15 @@ export default function StudentModal({ isOpen, onClose, student, onSave }) {
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Select Class inside Department</label>
                 <select
-                  required
                   value={formData.classId}
                   onChange={(e) => setFormData({ ...formData, classId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-blue-500 bg-white"
                 >
                   {filteredClasses.length === 0 ? (
-                    <option value="">No active classes in this department</option>
+                    <option value="">No active classes (Auto-assigned by department)</option>
                   ) : (
                     filteredClasses.map(c => (
-                      <option key={c._id} value={c._id}>{c.name} (Sem {c.semester} - {c.academicYear})</option>
+                      <option key={c._id} value={getIdStr(c)}>{c.name} (Sem {c.semester} - {c.academicYear})</option>
                     ))
                   )}
                 </select>
@@ -291,7 +318,7 @@ export default function StudentModal({ isOpen, onClose, student, onSave }) {
                 >
                   <option value="">Use Class Faculty Advisor</option>
                   {facultyList.map(f => (
-                    <option key={f._id} value={f._id}>{f.name} ({f.department})</option>
+                    <option key={f._id} value={getIdStr(f)}>{f.name} ({f.department})</option>
                   ))}
                 </select>
               </div>
@@ -308,8 +335,8 @@ export default function StudentModal({ isOpen, onClose, student, onSave }) {
             </button>
             <button
               type="submit"
-              disabled={loading || !formData.classId}
-              className="px-5 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              disabled={loading || !formData.departmentId}
+              className="px-5 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
               {loading ? 'Processing...' : student ? 'Update & Predict' : 'Create & Predict'}
