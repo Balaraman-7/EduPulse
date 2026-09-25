@@ -8,8 +8,7 @@ import {
   UserCheck,
   AlertTriangle,
   FileText,
-  MessageSquareHeart,
-  Award
+  MessageSquareHeart
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -71,16 +70,6 @@ export default function Sidebar() {
             })}
           </nav>
         </div>
-      </div>
-
-      {/* Role Footer Card */}
-      <div className="p-3.5 bg-blue-50/80 rounded-xl border border-blue-100 text-xs text-blue-900">
-        <p className="font-semibold flex items-center gap-1.5 mb-1">
-          <Award className="w-4 h-4 text-blue-600" /> EduPulse System
-        </p>
-        <p className="text-blue-700 leading-relaxed">
-          Dynamic Dept $\rightarrow$ Class $\rightarrow$ Student hierarchy & XAI risk warning.
-        </p>
       </div>
     </aside>
   );
