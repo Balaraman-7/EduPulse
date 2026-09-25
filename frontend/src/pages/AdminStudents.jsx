@@ -127,12 +127,16 @@ export default function AdminStudents() {
           <select
             value={semester}
             onChange={(e) => setSemester(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white font-semibold text-gray-700"
           >
             <option value="All">All Semesters</option>
+            <option value="1">Sem 1</option>
             <option value="2">Sem 2</option>
+            <option value="3">Sem 3</option>
             <option value="4">Sem 4</option>
+            <option value="5">Sem 5</option>
             <option value="6">Sem 6</option>
+            <option value="7">Sem 7</option>
             <option value="8">Sem 8</option>
           </select>
         </div>
