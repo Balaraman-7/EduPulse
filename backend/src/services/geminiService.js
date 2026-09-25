@@ -1,10 +1,8 @@
 import axios from 'axios';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-
 export const generateGeminiRecommendations = async (student, prediction) => {
   const apiKey = process.env.GEMINI_API_KEY;
-  
+
   const systemPrompt = `You are EduPulse AI, an empathetic academic counselling support system for higher education institutions.
 IMPORTANT SAFETY & ETHICAL RULES:
 1. DO NOT diagnose medical, psychological, or psychiatric conditions.
@@ -23,7 +21,7 @@ Backlogs: ${student.backlogCount}
 Internal Examination Marks: ${student.internalMarks}%
 Assignment Score: ${student.assignmentScore}%
 Model-Estimated Risk Level: ${prediction.riskLevel} (${prediction.riskScore}%)
-Major Risk Factors: ${prediction.topFactors.map(f => f.friendlyName || f.feature).join(', ')}
+Major Risk Factors: ${prediction.topFactors ? prediction.topFactors.map(f => f.friendlyName || f.feature).join(', ') : 'Attendance, CGPA'}
 
 Respond ONLY with valid JSON matching this exact structure:
 {
@@ -52,7 +50,7 @@ Respond ONLY with valid JSON matching this exact structure:
       const parsed = JSON.parse(textOutput);
       return parsed;
     } catch (err) {
-      console.warn(`[Gemini API] Direct Gemini call failed: ${err.message}. Using structured local advice fallback.`);
+      console.warn(`[Gemini API] Direct Gemini call failed (${err.message}). Using structured local advice fallback.`);
     }
   }
 
@@ -62,7 +60,7 @@ Respond ONLY with valid JSON matching this exact structure:
   const cgpa = student.cgpa;
 
   return {
-    riskExplanation: `Current academic indicators suggest that ${student.name} would benefit from proactive academic support. Attendance (${att}%) and CGPA (${cgpa}) reflect areas where targeted faculty mentoring can help regain momentum.`,
+    riskExplanation: `Current academic indicators suggest that ${student.name} would benefit from proactive academic support. Attendance (${att}%) and CGPA (${cgpa}) reflect key areas where targeted faculty mentoring can help regain momentum.`,
     facultySuggestions: [
       `Schedule a 1-on-1 academic check-in session with ${student.name} to discuss attendance constraints.`,
       `Provide supplementary practice problems for core subjects with active backlogs (${backlogs}).`,
@@ -110,37 +108,142 @@ Rules:
         ]
       }, { timeout: 8000 });
 
-      return response.data.candidates[0].content.parts[0].text;
+      if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        return response.data.candidates[0].content.parts[0].text;
+      }
     } catch (err) {
-      console.warn(`[Gemini Chat] API request failed: ${err.message}. Using intelligent conversational fallback.`);
+      console.warn(`[Gemini Chat] API request failed (${err.message}). Using intelligent conversational fallback.`);
     }
   }
 
-  // Conversational response engine fallback
-  const msgLower = userMessage.toLowerCase();
-  if (msgLower.includes('attendance') || msgLower.includes('absent')) {
-    return `Hi ${student?.name || 'there'}! To boost your attendance from ${student?.attendancePercentage || 75}%:
-1. **Track Daily Classes**: Set a daily morning reminder for mandatory lectures.
-2. **Prioritize High-Credit Courses**: Ensure 100% attendance in lectures with heavy internal credit weight.
-3. **Submit Leave Intimations**: If absent due to health, submit medical documentation to your department head promptly so approved leaves are recorded.
-*Remember: Your faculty advisor is available to help resolve any scheduling conflicts!*`;
-  } else if (msgLower.includes('backlog') || msgLower.includes('clear')) {
-    return `Clearing backlogs requires a steady, structured approach:
-1. **Focus on Core Concepts**: Obtain previous 3 years of semester question papers.
-2. **Dedicated Daily Slot**: Reserve 1 hour every evening specifically for backlog revision.
-3. **Faculty Office Hours**: Visit your course instructor during office hours to solve difficult numericals or concepts.
-*You've got this! Step-by-step progress makes a huge difference.*`;
-  } else if (msgLower.includes('study plan') || msgLower.includes('schedule') || msgLower.includes('cgpa')) {
-    return `Here is a recommended 4-Step Academic Booster Strategy:
-- **Phase 1 (Morning)**: 45-minute focused reading of lecture notes before classes.
-- **Phase 2 (Afternoon)**: Active participation in lab practicals and tutorial problems.
-- **Phase 3 (Evening)**: Solve assignment questions and revise backlogs for 90 minutes.
-- **Phase 4 (Weekly Review)**: Test your knowledge every Sunday with mock quizzes.
-*Feel free to adjust this schedule with your faculty counsellor during your next review!*`;
+  // --- Intelligent Local Conversational Fallback Engine ---
+  const msgRaw = userMessage || '';
+  const msgLower = msgRaw.toLowerCase().trim();
+
+  // Normalize common typos (e.g. 'plain' -> 'plan', 'tody' -> 'today', 'atendance' -> 'attendance')
+  const isPlanQuery = /plan|plain|today|tody|schedule|schdule|routine|daily|agenda|task|timetable/i.test(msgRaw);
+  const isAttendanceQuery = /attendance|atendance|absent|bunk|percentage|shortage|classes|leave/i.test(msgRaw);
+  const isBacklogQuery = /backlog|backlogg|clear|fail|arrear|reexam|re-exam|pending/i.test(msgRaw);
+  const isExamQuery = /exam|exm|test|prep|study|cgpa|gpa|marks|score|internal|quiz|revision|notes/i.test(msgRaw);
+  const isFacultyQuery = /faculty|teacher|counsellor|counselor|mentor|advisor|professor|office hour/i.test(msgRaw);
+  const isStressQuery = /stress|anxious|worried|scared|hard|difficult|help|struggling|pressure|depressed|sad/i.test(msgRaw);
+  const isGreetingQuery = /^(hi|hello|hey|greetings|good morning|good afternoon|good evening|who are you)\b/i.test(msgRaw);
+
+  const name = student?.name || 'Student';
+  const att = student?.attendancePercentage || 75;
+  const cgpa = student?.cgpa || 7.0;
+  const backlogs = student?.backlogCount || 0;
+  const dept = student?.department || 'Engineering';
+  const sem = student?.semester || 4;
+
+  if (isGreetingQuery) {
+    return `Hello ${name}! 👋 I am **EduPulse AI**, your academic guidance assistant. 
+\nCurrently viewing your profile:
+- **Department**: ${dept} (Semester ${sem})
+- **Attendance**: ${att}%
+- **CGPA**: ${cgpa}
+- **Active Backlogs**: ${backlogs}
+
+How can I assist you today? You can ask me about creating a daily study plan, improving attendance, clearing backlogs, or exam prep strategies!`;
   }
 
-  return `Thank you for reaching out, ${student?.name || 'Student'}! 
-Based on your current academic profile (Attendance: ${student?.attendancePercentage || 75}%, CGPA: ${student?.cgpa || 7.0}), focusing on consistent attendance and timely assignment submissions will yield immediate improvements. 
+  if (isPlanQuery) {
+    return `Here is a personalized **Daily Action Plan** for **${name}** (Semester ${sem}):
 
-Is there a specific area like time management, exam prep, or backlog revision you'd like to focus on today?`;
+1. 🌅 **Morning Focus (8:00 AM - 12:00 PM)**:
+   - Attend all scheduled ${dept} lectures to maintain and improve your current attendance rate (${att}%).
+   - Take active notes on key lecture topics.
+
+2. ☀️ **Afternoon Session (2:00 PM - 5:00 PM)**:
+   - Complete ongoing lab reports and internal assignment tasks promptly to secure full internal marks.
+   - Review difficult concepts with classmates or peer tutors.
+
+3. 🌙 **Evening Revision (7:00 PM - 9:00 PM)**:
+   ${backlogs > 0 
+     ? `- Reserve 60 minutes specifically for backlog topic revision (${backlogs} active backlog${backlogs > 1 ? 's' : ''}).\n   - Reserve 60 minutes for current semester core subjects.`
+     : `- Spend 90 minutes revising current semester core topics to boost CGPA (${cgpa}).\n   - Practice 3-5 numerical problems or code exercises.`}
+
+4. 📌 **Quick Advice**:
+   - Check in with your faculty advisor this week for personalized guidance.`;
+  }
+
+  if (isAttendanceQuery) {
+    const requiredAtt = 75;
+    const isShort = att < requiredAtt;
+    return `Hi ${name}! Here is your **Attendance Optimization Strategy**:
+
+- **Current Attendance**: ${att}% ${isShort ? '⚠️ *(Below mandatory 75% target)*' : '✅ *(On track)*'}
+- **Department**: ${dept} | Semester ${sem}
+
+**Recommended Action Steps**:
+1. 🗓️ **Zero-Absence Goal**: Attend all remaining classes and labs this month without missing sessions.
+2. 📝 **Submit Medical/Official Leaves**: If you were absent due to legitimate reasons or health, ensure medical certificates are turned into the department head immediately.
+3. 🤝 **Faculty Check-in**: Meet your class coordinator to review your exact attendance margin before upcoming internal exams.
+
+*Tip: Maintaining >75% attendance unlocks full eligibility for semester end-exams.*`;
+  }
+
+  if (isBacklogQuery) {
+    return `Clearing backlogs requires a structured approach. Here is your **Backlog Resolution Roadmap**:
+
+- **Active Backlogs**: ${backlogs}
+- **Current CGPA**: ${cgpa}
+
+**Step-by-Step Strategy**:
+1. 📚 **Gather Past Exam Papers**: Download previous 3 years' end-semester question papers for subject backlogs.
+2. ⏱️ **Daily 60-Min Revision Block**: Dedicate 1 uninterrupted hour every evening exclusively to backlog preparation.
+3. 👩‍🏫 **Faculty Office Hours**: Visit your course instructor during weekly office hours to clear doubts on high-weightage chapters.
+4. 📝 **Mock Tests**: Practice solving 1 full paper under timed conditions every Sunday.
+
+*You can definitely clear these! Consistent daily effort is key.*`;
+  }
+
+  if (isExamQuery) {
+    return `Here is your **Academic & Exam Prep Strategy** (${name}, ${dept}):
+
+1. 🎯 **Priority Subject Matrix**: Focus 60% of study time on subjects with heaviest credit weightage and lowest internal scores.
+2. 🧠 **Active Recall & Spaced Repetition**: Instead of passive reading, test yourself using flashcards and past question papers.
+3. 📊 **CGPA Target Booster**: Aim to score 85%+ in internal assignments and continuous assessment tests.
+4. ⏰ **Pomodoro Method**: Work in 25-minute focused bursts followed by a 5-minute break to maintain concentration.
+
+*Feel free to adjust this routine with your faculty mentor!*`;
+  }
+
+  if (isFacultyQuery) {
+    return `Connecting with your faculty counsellor is a great decision, ${name}! 
+
+**How to approach your faculty mentor**:
+1. 📧 **Email or In-Person**: Drop by during their posted office hours or send a polite message requesting a 15-minute academic discussion.
+2. 📋 **What to Prepare**: Bring your latest attendance record (${att}%), internal marks, and specific questions regarding your coursework.
+3. 💬 **Discussion Points**: Ask for guidance on backlog revision priorities and strategies to boost your internal marks.
+
+*Faculty counsellors are here to support your success!*`;
+  }
+
+  if (isStressQuery) {
+    return `It is completely normal to feel overwhelmed at times, ${name}. Take a deep breath! 🌟
+
+**Here are 3 reassuring steps to regain focus**:
+1. 🎯 **Break Tasks Into Small Steps**: Don't try to study everything at once. Pick ONE subject or topic and work on it for 30 minutes.
+2. 📈 **Focus on Progress, Not Perfection**: Small improvements in attendance (${att}%) and study consistency build up quickly over time.
+3. 🗣️ **Reach Out for Support**: Talk to your faculty counsellor or a trusted mentor. You don't have to navigate academic challenges alone.
+
+How can I help break down your study topics today?`;
+  }
+
+  // --- Dynamic Catch-All Response (Tailored to specific query text) ---
+  const cleanedTopic = msgRaw.length > 50 ? msgRaw.substring(0, 50) + '...' : msgRaw;
+  return `Thank you for your question regarding **"${cleanedTopic}"**, ${name}!
+
+Based on your profile in **${dept} (Semester ${sem})**:
+- **Attendance**: ${att}%
+- **CGPA**: ${cgpa}
+${backlogs > 0 ? `- **Active Backlogs**: ${backlogs}` : ''}
+
+**Custom Guidance for your query**:
+1. 💡 **Focus Area**: Align your daily study routine around high-priority subjects and mandatory lecture attendance.
+2. 📖 **Action Item**: Set aside 45-60 minutes today to review your recent notes or complete upcoming assignment submissions.
+3. 👩‍🏫 **Mentorship**: Discuss your specific goal ("${cleanedTopic}") with your faculty advisor for official department guidance.
+
+Is there a specific topic, schedule, or study technique you would like more detail on?`;
 };

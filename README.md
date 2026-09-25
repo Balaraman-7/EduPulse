@@ -131,3 +131,16 @@ Use the 1-click **Viva Demo Instant Access** bar on the login page:
 
 ### Q3: Why is Recall prioritized over Precision in model evaluation?
 *Answer*: In early warning systems, False Negatives (failing to identify a student who will drop out) have far higher consequences than False Positives (spending a few minutes checking in on a student who is safe). High recall ensures maximum coverage of vulnerable students.
+
+---
+
+## 🚀 Production Deployment
+
+For complete production deployment instructions covering **Vercel** (Frontend & Backend API), **MongoDB Atlas**, and **Render/Railway** (Python ML Service), refer to [DEPLOYMENT.md](DEPLOYMENT.md).
+
+---
+
+## ⚠️ Academic Disclaimer
+
+**Important**: This application is a college prototype decision-support tool designed for early risk identification and academic mentoring support. Model outputs are probabilistic estimates and should **NOT** be treated as clinical or institutional certainty. All predictions and AI recommendations must be reviewed by authorized institutional faculty counsellors before taking administrative or intervention actions.
+
